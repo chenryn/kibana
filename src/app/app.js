@@ -15,6 +15,7 @@ define([
   'angular-cookies',
   'angular-resource',
   'angular-route',
+  'ui-utils',
   'extend-jquery',
   'bindonce',
 ],
@@ -119,6 +120,7 @@ function (angular, $, _, appLevelRequire) {
     'ngCookies',
     'ngResource',
     'ngRoute',
+    'ui.event',
     'kibana',
     'pasvaz.bindonce'
   ];
@@ -158,6 +160,7 @@ function (angular, $, _, appLevelRequire) {
             pre_boot_modules = false;
 
             $rootScope.requireContext = appLevelRequire;
+            $rootScope.user = uglyuser;
             $rootScope.require = function (deps, fn) {
               var $scope = this;
               $scope.requireContext(deps, function () {

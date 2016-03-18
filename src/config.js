@@ -26,6 +26,16 @@ function (Settings) {
      */
     elasticsearch: "http://"+window.location.hostname+":9200",
     
+
+    /*
+    * logout kibana
+    */
+    logout: "/logout",
+    /*
+    * show username and logout link on the right of the navbar
+    */
+    showuser: true,
+
     /** @scratch /configuration/config.js/5
      *
      * ==== api_version
@@ -35,7 +45,7 @@ function (Settings) {
      * Valid version: 0.9, 1.0, 1.1, 1.2
      */
     api_version: "1.0",
-    
+
     /** @scratch /configuration/config.js/5
      *
      * ==== sniff
@@ -75,6 +85,26 @@ function (Settings) {
      */
     kibana_index: "kibana-int",
 
+
+    /*
+     * display notice on top of the page. you could config it as below
+    notice: {
+      'title':'kibana3 update',
+      'text': 'now kibana3 support es2!',
+     },
+     */
+    notice: null,
+
+     /*
+     * choose which catetory the dashboard belong to when save dashboard
+     */
+     dashboard_class: [
+       {'MOBILE':["Client","Server"]},
+       {'Cloud':[]},
+       {'OPS':["network", "storage"]},
+       {'APP':["search","ad"]},
+       {'WEB':[]}
+     ],
     /** @scratch /configuration/config.js/5
      *
      * ==== panel_name
@@ -83,6 +113,9 @@ function (Settings) {
      * dashboard, but this list is used in the "add panel" interface.
      */
     panel_names: [
+      'entry',
+      'filtertable',
+      'multiplechoice',
       'histogram',
       'map',
       'goal',

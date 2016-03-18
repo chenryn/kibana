@@ -38,8 +38,18 @@ function (angular, app, _, $, kbn) {
         {title:'Queries', src:'app/partials/querySelect.html'}
       ],
       status  : "Stable",
-      description : "Displays the results of an elasticsearch facet as a pie chart, bar chart, or a "+
-        "table"
+      description : "Displays the results of an elasticsearch facet as a pie " +
+        "chart, bar chart, or a table.<br>" +
+        "In order to be forward compatible, we reserve the right to display " +
+        "min and order by max/avg/total. So we have to use stats aggregate, " +
+        "But I think single min/max/avg/sum aggregation performs better.<br>" +
+        "And also we remove total_count option in editor.html<br>" +
+        "We do not support missing/other, but i will add them later<br>" +
+        "为了向前兼容, 我们选择了用stats aggregations, " +
+        "但考虑到性能以及可能不会有人按max排序,但展示的是最小值, " +
+        "换用单一的min/max/avg/sum aggregation, 可能会更好.<br>" +
+        "同时aggs里面不再有total_count的返回值,在配置界面中也拿掉了.<br>" +
+        "暂时没有missing/other功能,以后会补上.<br>"
     };
 
     // Set and populate defaults
@@ -176,38 +186,108 @@ function (angular, app, _, $, kbn) {
         boolQuery = boolQuery.should(querySrv.toEjsObj(q));
       });
 
+      var query = $scope.ejs.FilteredQuery(
+        boolQuery,
+        filterSrv.getBoolFilter(filterSrv.ids())
+      );
+      // request = request.query(query);
+
       // Terms mode
       if($scope.panel.tmode === 'terms') {
-        terms_facet = $scope.ejs.TermsFacet('terms')
+        var terms_aggs = $scope.ejs.TermsAggregation('terms')
           .field($scope.field)
           .size($scope.panel.size)
-          .order($scope.panel.order)
-          .exclude($scope.panel.exclude)
-          .facetFilter($scope.ejs.QueryFilter(
-            $scope.ejs.FilteredQuery(
-              boolQuery,
-              filterSrv.getBoolFilter(filterSrv.ids())
-            )));
-        if($scope.panel.fmode === 'script') {
-          terms_facet.scriptField($scope.panel.script)
-        }
-        request = request.facet(terms_facet).size(0);
+          .exclude($scope.panel.exclude);
+          if($scope.panel.fmode === 'script') {
+            terms_aggs.script($scope.panel.script);
+          }
+          switch($scope.panel.order) {
+            case 'term':
+            terms_aggs.order('_term','asc');
+            break;
+            case 'count':
+            terms_aggs.order('_count');
+            break;
+            case 'reverse_count':
+            terms_aggs.order('_count','asc');
+            break;
+            case 'reverse_term':
+            terms_aggs.order('_term');
+            break;
+            default:
+            terms_aggs.order('_count');
+          }
+        request = request.query(query).agg(terms_aggs).size(0);
       }
-      if($scope.panel.tmode === 'terms_stats') {
-        termstats_facet = $scope.ejs.TermStatsFacet('terms')
-          .valueField($scope.panel.valuefield)
-          .keyField($scope.field)
-          .size($scope.panel.size)
-          .order($scope.panel.order)
-          .facetFilter($scope.ejs.QueryFilter(
-            $scope.ejs.FilteredQuery(
-              boolQuery,
-              filterSrv.getBoolFilter(filterSrv.ids())
-            )));
-        if($scope.panel.fmode === 'script') {
-          termstats_facet.scriptField($scope.panel.script)
-        }
-        request = request.facet(termstats_facet).size(0);
+      else if($scope.panel.tmode === 'terms_stats') {
+        var terms_aggs = $scope.ejs.TermsAggregation('terms')
+          .field($scope.panel.field)
+          .size($scope.panel.size);
+
+          var sub_aggs = $scope.ejs.StatsAggregation('subaggs')
+            .field($scope.panel.valuefield);;
+          // switch($scope.panel.tstat) {
+          //   case 'count':
+          //   break;
+          //   case 'min':
+          //   sub_aggs = $scope.ejs.MinAggregation('subaggs')
+          //     .field($scope.panel.valuefield);
+          //   break;
+          //   case 'max':
+          //   sub_aggs = $scope.ejs.MaxAggregation('subaggs')
+          //     .field($scope.panel.valuefield);
+          //   break;
+          //   case 'total':
+          //   sub_aggs = $scope.ejs.SumAggregation('subaggs')
+          //     .field($scope.panel.valuefield);
+          //   break;
+          //   case 'mean':
+          //   sub_aggs = $scope.ejs.AvgAggregation('subaggs')
+          //     .field($scope.panel.valuefield);
+          //   break;
+          // }
+
+          switch($scope.panel.order) {
+            case 'term':
+              terms_aggs.order('_term','asc');
+              break;
+            case 'reverse_term':
+              terms_aggs.order('_term','desc');
+              break;
+            case 'count':
+              terms_aggs.order('_count','desc');
+              break;
+            case 'reverse_count':
+              terms_aggs.order('_count','asc');
+              break;
+            case 'total':
+              terms_aggs.order('subaggs.sum','desc');
+              break;
+            case 'reverse_total':
+              terms_aggs.order('subaggs.sum','asc');
+              break;
+            case 'min':
+              terms_aggs.order('subaggs.min','desc');
+              break;
+            case 'reverse_min':
+              terms_aggs.order('subterms.min','asc');
+              break;
+            case 'max':
+              terms_aggs.order('subaggs.max','desc');
+              break;
+            case 'reverse_max':
+              terms_aggs.order('subaggs.max','asc');
+              break;
+            case 'mean':
+              terms_aggs.order('subaggs.avg','desc');
+              break;
+            case 'reverse_mean':
+              terms_aggs.order('subaggs.avg','asc');
+              break;
+          }
+
+        request = request.query(query)
+        .agg(terms_aggs.agg(sub_aggs)).size(0);
       }
 
       // Populate the inspector panel
@@ -218,9 +298,7 @@ function (angular, app, _, $, kbn) {
       // Populate scope when we have results
       results.then(function(results) {
         $scope.panelMeta.loading = false;
-        if($scope.panel.tmode === 'terms') {
-          $scope.hits = results.hits.total;
-        }
+        $scope.hits = results.hits.total;
 
         $scope.results = results;
 
@@ -312,27 +390,41 @@ function (angular, app, _, $, kbn) {
         });
 
         function build_results() {
+          //forward_compatible_map
+          var _fcm = {
+            "sum":"sum",
+            "total":"sum",
+            "mean":"avg",
+            "avg":"avg",
+            "min":"min",
+            "max":"max",
+            "count":"count"
+          };
           var k = 0;
           scope.data = [];
-          _.each(scope.results.facets.terms.terms, function(v) {
+          _.each(scope.results.aggregations.terms.buckets, function(v) {
             var slice;
             if(scope.panel.tmode === 'terms') {
-              slice = { label : v.term, data : [[k,v.count]], actions: true};
+              slice = { label : v.key, data : [[k,v.doc_count]], actions: true};
             }
             if(scope.panel.tmode === 'terms_stats') {
-              slice = { label : v.term, data : [[k,v[scope.panel.tstat]]], actions: true};
+              slice = {
+                label : v.key,
+                data : [[k,v['subaggs'][_fcm[scope.panel.tstat]]]],
+                actions: true
+              };
             }
             scope.data.push(slice);
             k = k + 1;
           });
 
-          scope.data.push({label:'Missing field',
-            data:[[k,scope.results.facets.terms.missing]],meta:"missing",color:'#aaa',opacity:0});
-
-          if(scope.panel.tmode === 'terms') {
-            scope.data.push({label:'Other values',
-              data:[[k+1,scope.results.facets.terms.other]],meta:"other",color:'#444'});
-          }
+          // scope.data.push({label:'Missing field',
+          //   data:[[k,scope.results.facets.terms.missing]],meta:"missing",color:'#aaa',opacity:0});
+          //
+          // if(scope.panel.tmode === 'terms') {
+          //   scope.data.push({label:'Other values',
+          //     data:[[k+1,scope.results.facets.terms.other]],meta:"other",color:'#444'});
+          // }
         }
 
         // Function for rendering panel

@@ -17,6 +17,14 @@
     <script src="vendor/require/require.js"></script>
     <script src="app/components/require.config.js"></script>
     <script>require(['app'], function () {})</script>
+    <script>
+    /* it is an ugly hack.
+    * want to pass user from backend(django etc) to kibana,
+    * but do not know how to make it elegantly
+    * uglyuser is a global var which will be used in app.js later
+    */
+    uglyuser = "guest";
+    </script>
     <style>
     </style>
 
@@ -35,6 +43,10 @@
     <link rel="stylesheet" href="css/jquery-ui.css">
     <link rel="stylesheet" href="css/jquery.multiselect.css">
 
+    <div ng-cloak class="alert-info dashboard-notice" ng-show="config.notice">
+      <button type="button" class="close" ng-click="config.notice=null;" style="padding-right:50px">&times;</button>
+      <strong>{{config.notice.title}}</strong> <span ng-bind-html='config.notice.text'></span>
+    </div>
     <div ng-cloak ng-repeat='alert in dashAlerts.list' class="alert-{{alert.severity}} dashboard-notice" ng-show="$last">
       <button type="button" class="close" ng-click="dashAlerts.clear(alert)" style="padding-right:50px">&times;</button>
       <strong>{{alert.title}}</strong> <span ng-bind-html='alert.text'></span> <div style="padding-right:10px" class='pull-right small'> {{$index + 1}} alert(s) </div>
@@ -54,3 +66,5 @@
 
   </body>
 </html>
+<!-- backend could add this line here to pass the user-->
+<!-- <script> uglyuser = "test"; </script> -->

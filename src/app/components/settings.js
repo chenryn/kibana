@@ -10,7 +10,12 @@ function (_) {
      * @type {Object}
      */
     var defaults = {
+      dashboard_class   : [],
+      sniff             : true,
       elasticsearch     : "http://"+window.location.hostname+":9200",
+      logout            : "/logout",
+      showuser          : false,
+      notice            : null,
       api_version       : "1.0",
       sniff             : true,
       request_timeout   : 30000,

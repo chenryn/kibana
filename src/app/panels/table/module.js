@@ -51,6 +51,10 @@ function (angular, app, _, kbn, moment) {
           src: 'app/panels/table/pagination.html'
         },
         {
+          title:'Color',
+          src: 'app/panels/table/color.html'
+        },
+        {
           title:'Queries',
           src: 'app/partials/querySelect.html'
         }
@@ -129,6 +133,10 @@ function (angular, app, _, kbn, moment) {
        * timeField:: If localTime is set to true, this field will be adjusted to the browsers local time
        */
       timeField: '@timestamp',
+      /** @scratch /panels/table/5
+       * colorRules:: filed, value(RegExp), color
+       */
+      colorRules: [],
       /** @scratch /panels/table/5
        * spyable:: Set to false to disable the inspect icon
        */
@@ -243,6 +251,29 @@ function (angular, app, _, kbn, moment) {
       },0);
     };
 
+    $scope.getStyle = function(event){
+      var backgroundColor = getBackgroundColor(event);
+      if(backgroundColor){
+        return {'background-color': backgroundColor};
+      }
+    };
+
+    var getBackgroundColor = function(event){
+      var i, len, cr, data;
+
+      for(i=0, len=$scope.panel.colorRules.length; i<len; i++){
+        cr = $scope.panel.colorRules[i];
+        if(cr.field != '_index' && cr.field != '_type' && cr.field != '_id' && cr.field != '_score'){
+          data = event._source;
+        } else{
+          data = event;
+        }
+        if(data[cr.field] && data[cr.field].match(new RegExp(cr.value))){
+          return cr.color;
+        }
+      }
+    };
+
     var showModal = function(panel,type) {
       $scope.facetPanel = panel;
       $scope.facetType = type;
@@ -260,6 +291,7 @@ function (angular, app, _, kbn, moment) {
         limit: 10,
         count: _.countBy(docs,function(doc){return _.contains(_.keys(doc),field);})['true']
       };
+
 
       var nodeInfo = $scope.ejs.getFieldMapping(dashboard.indices, field);
 
@@ -283,12 +315,26 @@ function (angular, app, _, kbn, moment) {
     };
 
     $scope.set_sort = function(field) {
-      if($scope.panel.sort[0] === field) {
-        $scope.panel.sort[1] = $scope.panel.sort[1] === 'asc' ? 'desc' : 'asc';
-      } else {
-        $scope.panel.sort[0] = field;
-      }
-      $scope.get_data();
+
+      var nodeInfo = $scope.ejs.getFieldMapping(dashboard.indices, field);
+
+      return nodeInfo.then(function(p) {
+        var types = _.uniq(jsonPath(p, '*.*.*.*.mapping.*.type'));
+        var indices = _.uniq(jsonPath(p, '*.*.*.*.mapping.*.index'));
+
+        if(_.intersection(types, ['string']).length > 0 && _.intersection(indices, ['not_analyzed']).length != 1) {
+          $scope.panel.error = "could not sort by an analyzed field;";
+          return;
+        }
+        else{
+          if($scope.panel.sort[0] === field) {
+            $scope.panel.sort[1] = $scope.panel.sort[1] === 'asc' ? 'desc' : 'asc';
+          } else {
+            $scope.panel.sort[0] = field;
+          }
+          $scope.get_data();
+        }
+      });
     };
 
     $scope.toggle_field = function(field) {
@@ -386,7 +432,9 @@ function (angular, app, _, kbn, moment) {
           .fragmentSize(2147483647) // Max size of a 32bit unsigned int
           .preTags('@start-highlight@')
           .postTags('@end-highlight@')
-        ).sort(sort);
+        )
+        .size($scope.panel.size*$scope.panel.pages)
+        .sort(sort);
 
       $scope.populate_modal(request);
 
